@@ -5,8 +5,8 @@ var Botkit    = require('./lib/Botkit.js');
 var translate = require('./bot/labels');
 var botData   = require('./bot/data');
 
-var access_token = "XXX";
-var verify_token = "123456"; 
+var access_token = "";
+var verify_token = ""; 
 
 var controller = Botkit.facebookbot({
     debug: false,
@@ -179,42 +179,11 @@ var getImage = function(url){
 }
 
 //A
-var welcomeMsg = function(bot, message){
-    
-    url = "https://graph.facebook.com/v2.8/"+message.user+"?access_token="+access_token;
-    
-    request(url, function (error, response, body) {
-        if (!error && response.statusCode == 200) {
-            
-            var userData = JSON.parse(body);
 
-            lng = translate.set(userData.locale);
-
-            user = {
-                data : userData,
-                option : {
-                    gender : 0,
-                    username   : '',
-                    age    : 0
-                }
-            }            
-
-            
-            bot.reply(message, translate.get('t01', {first_name : user.data.first_name, hour : hourTxt}), function(){
-                
-                conversation();
-                
-            })
-            
-
-        }
-    });    
-
-}
 
 //A1
 var conversation = function(bot, message){
-
+    console.log("conversation");
     var conversation1 = function(response, convo){
         currentConversation = convo;
 
@@ -238,7 +207,6 @@ var conversation = function(bot, message){
         },{
             default: true,
             callback: function(response,convo) {
-                convo.ask(""); //Repregunta y repito
                 convo.repeat();
                 convo.next();
             }
@@ -251,7 +219,7 @@ var conversation = function(bot, message){
             default: true,
             callback: function(response,convo) {
                 convo.setVar('name', response.text);
-                conversation3();
+                conversation3(response, convo);
                 convo.next();
             }
         }]); 
@@ -259,7 +227,7 @@ var conversation = function(bot, message){
     
     var conversation3 = function(response, convo){
 
-        convo.ask("Que edad tienes {{name}}", [{
+        convo.ask("Que edad tienes", [{
             default: true,
             callback: function(response,convo) {
                 if(Number.isInteger(parseInt(response.text))){
@@ -277,16 +245,36 @@ var conversation = function(bot, message){
     var conversationEnd = function(response, convo){
         
         convo.stop();
-        bot.reply(message, translate.get('t12'), function(){
-            bot.reply(message, getTemplateTypes(user.option.username));
+        bot.reply("ok", function(){
+            bot.reply(message, getTemplateTypes("Usuario"));
         })
 
     }
-
-    bot.startConversation(message, sendConversation1);
+    
+    bot.startConversation(message, conversation1);
 
 }
 
+var welcomeMsg = function(bot, message){
+    
+    url = "https://graph.facebook.com/v2.8/"+message.user+"?access_token="+access_token;
+    
+    request(url, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            
+            var userData = JSON.parse(body);
+            
+            bot.reply(message, "Hola "+userData.first_name, function(){
+                
+                conversation(bot, message);
+                
+            })
+            
+
+        }
+    });    
+
+}
 
 var optionSelected = function(bot, message, options){
     
