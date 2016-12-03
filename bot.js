@@ -1,12 +1,12 @@
-var request    = require('request');
+var request    = require("request");
 
 //BOT
-var Botkit    = require('./lib/Botkit.js');
-var translate = require('./bot/labels');
-var botData   = require('./bot/data');
+var Botkit    = require("./lib/Botkit.js");
+var translate = require("./bot/labels");
+var botData   = require("./bot/data");
 
 var access_token = "";
-var verify_token = ""; 
+var verify_token = "";  
 
 var controller = Botkit.facebookbot({
     debug: false,
@@ -21,138 +21,128 @@ var port = process.env.PORT || process.env.port || 3000;
 controller.setupWebserver(port, function(err, webserver) {
     
     controller.createWebhookEndpoints(webserver, bot, function() {
-        console.log('ONLINE!');
+        console.log("ONLINE!");
     });
 
-    webserver.get('/',function(req,res) {
-        console.log('INDEX');
+    webserver.get("/",function(req,res) {
+        console.log("INDEX");
     });
 
 });
 
+var mysql      = require("mysql");
+var connection = mysql.createConnection({
+  host     : 'localhost',
+  user     : 'root',
+  password : '',
+  database : 'agro'
+});
+
+connection.connect();
+
 //----------------------------------------------------------------------------------------------------------------------------
 
-var result        = [];
-var user = {
-    data : {},
-    option : {
-        gender   : 0,
-        username : '',
-        age      : 0
-    }
-}  
-var templateTypes = {};
-var lng           = 'es';
-var currentConversation = false;
+var currentConversation = [];
 
-
-
-var getTemplateWelcome = function(text){
+var getTemplateWelcome = function(){
     
     var templateWelcome = {
         "attachment":{
             "type":"template",
             "payload":{
                 "template_type":"button",
-                "text": text ,
+                "text": "¿Qué desea hacer?" ,
                 "buttons":[{
                     "type":"postback",
-                    "title": translate.get('btnEmpezar_1'),
-                    "payload":"SEND"
+                    "title": "Condiciones Actuales",
+                    "payload":"CONDICIONES"
                 },
                 {
                     "type":"postback",
-                    "title": translate.get('btnEmpezar_2'),
-                    "payload":"FIND"
-                }]
+                    "title": "Pronostico",
+                    "payload":"PRONOSTICO"
+                },
+                {
+                    "type":"postback",
+                    "title": "Enviar Datos",
+                    "payload":"ENVIAR"
+                },
+                ]
             }
         }
     }
 
     return templateWelcome;
-
 }
 
-var getTemplateTypes = function(username){
-
-    var templateTypes = {
+var getTemplateData = function(){
+    
+    var template = {
         "attachment":{
             "type":"template",
             "payload":{
                 "template_type":"button",
-                "text": translate.get('t13',{username : username}),
+                "text": "¿Sobre qué quiere reportar?" ,
                 "buttons":[{
                     "type":"postback",
-                    "title": translate.get('divertido'),
-                    "payload":"OPTION_A"
+                    "title": "Enfermedades",
+                    "payload":"ENFERMEDADES"
                 },
                 {
                     "type":"postback",
-                    "title": translate.get('amigable'),
-                    "payload":"OPTION_B"
+                    "title": "Plagas",
+                    "payload":"PLAGAS"
                 },
                 {
                     "type":"postback",
-                    "title":translate.get('romantico'),
-                    "payload":"OPTION_C"
-                }]
+                    "title": "Daño Climatico",
+                    "payload":"DANIO"
+                },
+                ]
             }
-        }    
-    } 
+        }
+    }
 
-    return templateTypes;
-
+    return template;
 }
 
-var getTemplateSearch = function(){
-
-    var templateTypes = {
+var getTemplateDanio = function(){
+    
+    var template = {
         "attachment":{
             "type":"template",
             "payload":{
                 "template_type":"button",
-                "text": translate.get('t15'),
+                "text": "¿Daño de que tipo se presenta?" ,
                 "buttons":[{
                     "type":"postback",
-                    "title": translate.get('si'),
-                    "payload":"SEARCH_YES"
+                    "title": "Granizo",
+                    "payload":"GRANIZO"
                 },
                 {
                     "type":"postback",
-                    "title": translate.get('no'),
-                    "payload":"SEARCH_NO"
-                }]
+                    "title": "Helada",
+                    "payload":"HELADA"
+                }
+                ]
             }
-        }    
-    } 
+        }
+    }
 
-    return templateTypes;
+    return template;
 }
 
-var getTemplateGreeting = function(){
+var getTemplateLocation = function(){
+    var template ={ 
+            "text":"Please share your location:",
+            "quick_replies":[{
+                "content_type":"location"
+            }]
+    };
 
-    var templateTypes = {
-        "attachment":{
-            "type":"template",
-            "payload":{
-                "template_type":"button",
-                "text": translate.get('t20'),
-                "buttons":[{
-                    "type":"postback",
-                    "title": translate.get('si'),
-                    "payload":"GREETING_YES"
-                },
-                {
-                    "type":"postback",
-                    "title": translate.get('no'),
-                    "payload":"GREETING_NO"
-                }]
-            }
-        }    
-    } 
-
-    return templateTypes;
+    return template;
 }
+
 
 var getImageStart = function(url){
     var template = {
@@ -178,82 +168,197 @@ var getImage = function(url){
     return template;
 }
 
-//A
+var weather = function(bot, message, coor){
 
+    key     = "75b9a089c02b1908b7a99cd78d35ee01";
+    country = "US";
 
-//A1
-var conversation = function(bot, message){
-    console.log("conversation");
-    var conversation1 = function(response, convo){
-        currentConversation = convo;
+    units   = "metric";
 
-        convo.say("Buenas tardes");
-
-        var currentAsk = 0;
-        var ask = [translate.get('t06'),translate.get('t07'),translate.get('t08')]
-
-        convo.ask("Es de día o de noche", [{
-            pattern: "día",
-            callback: function(response,convo) {
-                conversation2(response, convo)
-                convo.next();
-            }
-        },{
-            pattern: "noche",
-            callback: function(response,convo) {
-                conversation2(response, convo)
-                convo.next();
-            }
-        },{
-            default: true,
-            callback: function(response,convo) {
-                convo.repeat();
-                convo.next();
-            }
-        }]);
-    }
-
-    var conversation2 = function(response, convo){   
-
-        convo.ask("¿Cual es tu nombre?",[{
-            default: true,
-            callback: function(response,convo) {
-                convo.setVar('name', response.text);
-                conversation3(response, convo);
-                convo.next();
-            }
-        }]); 
-    }
-    
-    var conversation3 = function(response, convo){
-
-        convo.ask("Que edad tienes", [{
-            default: true,
-            callback: function(response,convo) {
-                if(Number.isInteger(parseInt(response.text))){
-                    convo.setVar('age', response.text);
-                    conversationEnd(response, convo)
-                }else{
-                    convo.next();    
-                }
-                
-            }
-        }]);  
-
-    }
-
-    var conversationEnd = function(response, convo){
+    //ACTUAL
+    url = "http://api.openweathermap.org/data/2.5/weather?lat="+coor.lat+"&lon="+coor.lng+"&appid="+key+"&units="+units+"&lang=es";
+    console.log(url)
+    request(url, function (error, response, body) {
         
-        convo.stop();
-        bot.reply("ok", function(){
-            bot.reply(message, getTemplateTypes("Usuario"));
-        })
+        if (!error && response.statusCode == 200) {
+            
+            var weatherData = JSON.parse(body);
+            
+            var elements = [];
+            var loop = 0;
+            
+                
+            if(elements.length < 10){
+                console.log((loop % 8))
+                if((loop % 8) == 0){
+                    
+                    elements.push({
+                        "title"     : weatherData.weather[0].description,
+                        "subtitle"  : "Temperatura: "+weatherData.main.temp+" - Minima: "+weatherData.main.temp_min+""+" - Maxima: "+weatherData.main.temp_max+"",
+                        "image_url" : "http://openweathermap.org/img/w/"+weatherData.weather[0].icon+".png",
+                        /*
+                        "buttons":[{
+                            "type" : "web_url",
+                            "url"  : "http://maps.google.com/maps?&z=15&mrt=yp&t=m&q="+botData.stores[n].lat.replace(',','.')+"+"+botData.stores[n].lng.replace(',','.')+"",
 
-    }
-    
-    bot.startConversation(message, conversation1);
+                            "title": translate.get(lng["u"+message.user], "ir")
+                        }]
+                        */
+                    });
+                    
+                }
+            }       
+                 
+            
+            
+            var template = {
+                "attachment":{
+                    "type":"template",
+                    "payload":{
+                        "template_type":"generic",
+                        "elements":elements
+                    }
+                }
+            }     
+            console.log(elements);
+            bot.reply(message, template);       
+        }
+    });   
 
 }
+
+var forecast = function(bot, message, coor){
+
+    key     = "75b9a089c02b1908b7a99cd78d35ee01";
+    country = "US";
+    units   = "metric";
+   
+    url = "http://api.openweathermap.org/data/2.5/forecast?lat="+coor.lat+"&lon="+coor.lng+"&appid="+key+"&units="+units+"&lang=es";
+    console.log(url)
+    request(url, function (error, response, body) {
+        
+        if (!error && response.statusCode == 200) {
+            
+            var weatherData = JSON.parse(body);
+            
+            var elements = [];
+            var loop = 0;
+            for(n in weatherData.list){
+                
+                if(elements.length < 10){
+                    console.log((loop % 8))
+                    if((loop % 8) == 0){
+                        
+                        elements.push({
+                            "title"     : weatherData.list[n].weather[0].description,
+                            "subtitle"  : "Temperatura: "+weatherData.list[n].main.temp+" - Minima: "+weatherData.list[n].main.temp_min+""+" - Maxima: "+weatherData.list[n].main.temp_max+"",
+                            "image_url" : "http://openweathermap.org/img/w/"+weatherData.list[n].weather[0].icon+".png",
+                            /*
+                            "buttons":[{
+                                "type" : "web_url",
+                                "url"  : "http://maps.google.com/maps?&z=15&mrt=yp&t=m&q="+botData.stores[n].lat.replace(',','.')+"+"+botData.stores[n].lng.replace(',','.')+"",
+
+                                "title": translate.get(lng["u"+message.user], "ir")
+                            }]
+                            */
+                        });
+                        
+                    }
+                }       
+                loop++;         
+            }
+            
+            var template = {
+                "attachment":{
+                    "type":"template",
+                    "payload":{
+                        "template_type":"generic",
+                        "elements":elements
+                    }
+                }
+            }     
+            console.log(elements);
+            bot.reply(message, template);       
+        }
+    });  
+
+}
+
+
+var findEnfermedad = function(enfermedad){
+
+    enfermedadesData = ["Septoriosis","Mancha Amarilla","Bacteriosis","Oidio","Roya Amarilla","Roya Anaranjada","Carbon Volador"];
+    found = [];
+
+    for(var n in enfermedadesData){
+        var distArray = levenshteinenator(enfermedadesData[n].toLowerCase(), enfermedad.toLowerCase());
+        var dist      = distArray[ distArray.length - 1 ][ distArray[ distArray.length - 1 ].length - 1 ];
+
+        console.log("dist: " + dist);
+        if(dist < 7 && found.length < 3){
+            found.push(enfermedadesData[n]);
+        }
+    }    
+
+    if(found.length > 0){
+
+        var buttons = [];
+
+        for(var n in found){
+            buttons.push({
+                "type"    : "postback",
+                "title"   : found[n],
+                "payload" : "ENFERMEDAD_"+found[n]
+            })
+        }
+
+        var template = {
+            "attachment":{
+                "type":"template",
+                "payload":{
+                    "template_type":"button",
+                    "text": "Confirme de que enfermedad se trata",
+                    "buttons": buttons
+                }
+            }
+        }
+
+        return template;
+
+    }else{
+
+        return false;
+
+    }    
+
+}
+
+var enfermedadesConversation = function(bot, message){
+    
+    var enfermedadesConversation1 = function(response, convo){
+        
+        currentConversation["u"+message.user] = convo;
+        
+        convo.ask("Indique el nombre de la enfermedad",[{
+            default: true,
+            callback: function(response,convo) {
+                
+                enfermedadResponse = findEnfermedad(response.text); 
+                if(enfermedadResponse){
+                    bot.reply(message, enfermedadResponse)
+                }else{
+                    convo.repeat();
+                    convo.next();    
+                }
+            }
+        }]); 
+
+    }
+
+    bot.startConversation(message, enfermedadesConversation1);
+}
+
+
 
 var welcomeMsg = function(bot, message){
     
@@ -263,114 +368,117 @@ var welcomeMsg = function(bot, message){
         if (!error && response.statusCode == 200) {
             
             var userData = JSON.parse(body);
-            
-            bot.reply(message, "Hola "+userData.first_name, function(){
-                
-                conversation(bot, message);
-                
-            })
-            
+
+            connection.query("SELECT * FROM users WHERE fbId = '"+message.user+"'", function(err, rows, fields) {
+              if(!err){
+                console.log("Rows.length:", rows.length);
+                if(rows.length == 0){
+
+                    var post  = {first_name: userData.first_name, fbId: message.user};
+                    
+                    var query = connection.query('INSERT INTO users SET ?', post, function(err, result) {
+
+                        bot.reply(message, "Bienvenido "+userData.first_name, ". Para comenzar necesitamos conocer tu ubicación", function(){
+                            bot.reply(message, getTemplateLocation());
+                        })
+
+                    });
+ 
+                }else{
+                    
+                    bot.reply(message, "Hola "+userData.first_name, function(){
+
+                        //Opciones para iniciar
+                        bot.reply(message, getTemplateWelcome());
+                        
+                    })
+
+                }
+              }
+            });            
 
         }
     });    
 
 }
 
-var optionSelected = function(bot, message, options){
-    
-    
-    bot.reply(message, getImage(options.img_url), function(err,response){
-        bot.reply(message, translate.get('t14',{username : user.option.username}), function(err,response){
-            bot.reply(message, getTemplateSearch())
-        });
-
-    })
-    
-
-}
 
 //A4
 var findStore = false;
 
-//findConversation-----------------------------------------------------------------------
-var found = {};
-var findCity = function(bot, message, city){
-    
-    foundCities = [];
-
-    for(var n in botData.cities){
-        var distArray = levenshteinenator(botData.cities[n].toLowerCase(), city.toLowerCase());
-        var dist      = distArray[ distArray.length - 1 ][ distArray[ distArray.length - 1 ].length - 1 ];
-
-        if(dist < 4 && foundCities.length < 3){
-            foundCities.push(botData.cities[n]);
-        }
-    }
-
-    if(foundCities.length > 0){
-        
-        var buttons = [];
-
-        for(var n in foundCities){
-            buttons.push({
-                "type"    : "postback",
-                "title"   : foundCities[n],
-                "payload" : "CITY_"+foundCities[n]            
-            })
-        }
-    
-        var template = {
-            "attachment":{
-                "type":"template",
-                "payload":{
-                    "template_type":"button",
-                    "text": translate.get('t19'),
-                    "buttons": buttons 
-                }
-            }
-        }        
-          
-        
-        found = template;
-        return true;
-
-    }else{
-        
-        return false;
-
-    }    
-}
-
- 
-
-controller.hears(['hola','hi'], 'message_received', function(bot, message) {
+controller.hears(["hola","hi"], "message_received", function(bot, message) {
     welcomeMsg(bot, message);
 });
 
-controller.on('message_received', function(bot, message) {
+controller.on("message_received", function(bot, message) {
     
-    if(message.seq){
-        bot.reply(message, "Mensaje generico");  
+    if(message.attachments){
+        if(message.attachments[0].type == "location"){
+
+            coordinates = message.attachments[0].payload.coordinates
+
+            connection.query("UPDATE users SET lat = '"+coordinates.lat+"', lng = '"+coordinates.long+"'", function (err, result) {
+                if (!err){
+                    bot.reply(message, getTemplateWelcome());
+                }else{
+                    bot.reply(message, "No se pudo guardar la ubicación");
+                }
+                
+            })
+
+        }
     }
     
 });
 
-controller.on('facebook_postback', function(bot, message) {
+controller.on("facebook_postback", function(bot, message) {
     
-    if(message.payload.search('CITY_') > -1){
-        tmp = message.payload.split('_');
-        var cityName = tmp[1]
+    console.log("message.payload: " + message.payload);
+
+    if(message.payload.search("ENFERMEDAD_") > -1){
+        tmp = message.payload.split("_");
+        var enfermedadName = tmp[1]
+        bot.reply(message, "Enfermedad seleccionada: "+enfermedadName);
     }
 
+    if(currentConversation["u"+message.user]){
+        currentConversation["u"+message.user].stop();    
+    } 
+
     switch(message.payload){
-        case 'INIT':
-            if(currentConversation){
-                currentConversation.stop();    
-            }        
-            welcomeMsg(bot, message);
+        case "CONDICIONES":
+            weather(bot, message, {"lat" : "-37.322827", "lng" : "-59.079722"})
+            //bot.reply(message, getTemplateData());
+        break;
+        case "PRONOSTICO":
+            forecast(bot, message, {"lat" : "-37.322827", "lng" : "-59.079722"})
+            //bot.reply(message, getTemplateData());
+        break;
+        case "ENVIAR":
+      
+            bot.reply(message, getTemplateData());
         break;
 
-        case 'LANGUAGE':
+        case "ENFERMEDADES":
+
+            enfermedadesConversation(bot, message)
+        
+        break;
+
+        case "DANIO":
+        
+            bot.reply(message, getTemplateDanio());
+        break;
+            case "GRANIZO":
+        
+                bot.reply(message, "GRANIZO");
+            break;       
+            case "HELADA":
+        
+                bot.reply(message, "HELADA");
+            break;                            
+
+        case "LANGUAGE":
             translate.change();
         break;
 
