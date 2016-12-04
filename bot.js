@@ -134,7 +134,7 @@ var getTemplateDanio = function(){
 
 var getTemplateLocation = function(){
     var template ={ 
-            "text":"Please share your location:",
+            "text":"Por favor indique su posición:",
             "quick_replies":[{
                 "content_type":"location"
             }]
@@ -284,19 +284,62 @@ var forecast = function(bot, message, coor){
 
 }
 
+enfermedadesData = [{
+        "nombre" : "Septoriosis", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Azoxistrobina"
+    },
+    {
+        "nombre" : "Mancha Amarilla", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Metconazole o Difenoconazole"
+    },
+    {
+        "nombre" : "Bacteriosis", 
+        "tratamiento" : "Se recomienda evitar ingresar con la maquinaría al lote mientras el cultivo está mojado. Planificar rotación de cultivos en ese lote."
+    },
+    {
+        "nombre" : "Oidio", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Metconazole"
+    },
+    {
+        "nombre" : "Roya Amarilla", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Azoxistrobina "
+    },
+    {
+        "nombre" : "Roya Anaranjada", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Azoxistrobina "
+    },
+    {
+        "nombre" : "Carbon Volador", 
+        "tratamiento" : "Se recomienda aplicar formulación cuyo principio activo contenga Difenoconazole"
+    }                    
+    ];
+
+var enfermedadTratamiento = function(bot, message, enfermedad){
+
+    for(n in enfermedadesData){
+        console.log(enfermedadesData[n].nombre +"=="+ enfermedad)
+        if(enfermedadesData[n].nombre == enfermedad){
+            bot.reply(message, enfermedadesData[n].tratamiento);
+            break;
+        }
+    }
+
+}
 
 var findEnfermedad = function(enfermedad){
 
-    enfermedadesData = ["Septoriosis","Mancha Amarilla","Bacteriosis","Oidio","Roya Amarilla","Roya Anaranjada","Carbon Volador"];
+    
+    //enfermedadesData = ["Septoriosis","Mancha Amarilla","Bacteriosis","Oidio","Roya Amarilla","Roya Anaranjada","Carbon Volador"];
     found = [];
 
     for(var n in enfermedadesData){
-        var distArray = levenshteinenator(enfermedadesData[n].toLowerCase(), enfermedad.toLowerCase());
+        console.log(enfermedadesData[n].nombre.toLowerCase().replace(" ", "")+','+ enfermedad.toLowerCase().replace(" ", ""))
+        var distArray = levenshteinenator(enfermedadesData[n].nombre.toLowerCase().replace(" ", ""), enfermedad.toLowerCase().replace(" ", ""));
         var dist      = distArray[ distArray.length - 1 ][ distArray[ distArray.length - 1 ].length - 1 ];
 
         console.log("dist: " + dist);
-        if(dist < 7 && found.length < 3){
-            found.push(enfermedadesData[n]);
+        if(dist < 10 && found.length < 3){
+            found.push(enfermedadesData[n].nombre);
         }
     }    
 
@@ -378,7 +421,8 @@ var welcomeMsg = function(bot, message){
                     
                     var query = connection.query('INSERT INTO users SET ?', post, function(err, result) {
 
-                        bot.reply(message, "Bienvenido "+userData.first_name, ". Para comenzar necesitamos conocer tu ubicación", function(){
+
+                        bot.reply(message, "Bienvenido "+userData.first_name+". Para comenzar necesitamos conocer tu ubicación", function(){
                             bot.reply(message, getTemplateLocation());
                         })
 
@@ -437,8 +481,9 @@ controller.on("facebook_postback", function(bot, message) {
 
     if(message.payload.search("ENFERMEDAD_") > -1){
         tmp = message.payload.split("_");
-        var enfermedadName = tmp[1]
-        bot.reply(message, "Enfermedad seleccionada: "+enfermedadName);
+        var enfermedadName = tmp[1];
+
+        enfermedadTratamiento(bot, message, enfermedadName);
     }
 
     if(currentConversation["u"+message.user]){
@@ -446,6 +491,9 @@ controller.on("facebook_postback", function(bot, message) {
     } 
 
     switch(message.payload){
+        case "COMENZAR":
+            welcomeMsg(bot, message);
+        break;
         case "CONDICIONES":
             weather(bot, message, {"lat" : "-37.322827", "lng" : "-59.079722"})
             //bot.reply(message, getTemplateData());
